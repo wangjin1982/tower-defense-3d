@@ -58,7 +58,7 @@ export class Projectile {
     this.alive = true;
 
     const color = tower.def.color;
-    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak') {
+    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak' || this.kind === 'stunbomb') {
       this.mesh = buildRocketMesh(this.kind === 'frostrkt');
     } else {
       this.mesh = new THREE.Mesh(bulletGeo, new THREE.MeshBasicMaterial({ color }));
@@ -79,7 +79,7 @@ export class Projectile {
     const to = this.tmp.copy(this.lastPos).sub(this.pos);
     const dist = to.length();
 
-    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak') {
+    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak' || this.kind === 'stunbomb') {
       // 导弹：慢速出膛 → 逐渐加速到巡航速度
       this.speed = Math.min(this.cruise, this.speed + this.accel * dt);
       const flame = this.mesh.userData.flame;
@@ -105,10 +105,12 @@ export class Projectile {
       // 命中
       this.alive = false;
       // 溅射类：火箭 + 所有合体炮台（溅射覆盖三格）
-      const splashKind = ['rocket', 'cryo', 'frostrkt', 'flak', 'rail', 'frostsniper'].includes(this.kind);
+      const splashKind = ['rocket', 'cryo', 'frostrkt', 'flak', 'rail', 'frostsniper', 'stunbomb'].includes(this.kind);
       if (splashKind) {
         // 冻结系：冰冻炮 / 极寒火箭 / 冰晶狙击
         const freezes = this.kind === 'cryo' || this.kind === 'frostrkt' || this.kind === 'frostsniper';
+        // 眩晕系：麻醉炮（完全定身 0.9 秒）
+        const stuns = this.kind === 'stunbomb';
         const ringColor = this.tower.def.color;
         game.effects.explosion(this.pos.clone(), this.splash);
         if (freezes) game.effects.ring(this.pos.clone(), ringColor, this.splash * 1.3, 0.4);
@@ -121,6 +123,7 @@ export class Projectile {
             if (e.takeDamage(this.dmg * falloff)) game.onEnemyKilled(e, this.tower);
             // 冻结：冰冻系炮台溅射范围内的敌人被减速
             if (freezes) e.applySlow(this.tower.def.slow, this.tower.def.slowTime, game.now);
+            if (stuns) e.applySlow(1.0, this.tower.def.stun, game.now); // 眩晕：完全定身
           }
         }
       } else {
@@ -139,7 +142,7 @@ export class Projectile {
 
   dispose(scene) {
     scene.remove(this.mesh);
-    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak') {
+    if (this.kind === 'rocket' || this.kind === 'frostrkt' || this.kind === 'flak' || this.kind === 'stunbomb') {
       // 导弹几何体/材质为共享资产，只销毁独立克隆的尾焰材质
       const flame = this.mesh.userData.flame;
       if (flame) flame.material.dispose();

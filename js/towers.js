@@ -24,7 +24,28 @@ function buildMesh(def) {
   turret.position.y = 0.55;
   g.add(turret);
 
-  if (def.kind === 'gun' || def.kind === 'rail') {
+  if (def.kind === 'medic') {
+    // 医疗塔：白色底座 + 红十字 + 悬浮加号
+    const crossMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
+    const redMat = new THREE.MeshStandardMaterial({ color: 0xef5350, emissive: 0xef5350, emissiveIntensity: 0.25 });
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), crossMat);
+    post.position.y = 0.85;
+    g.add(post);
+    for (const rot of [0, Math.PI / 2]) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.22, 0.22), redMat);
+      arm.position.y = 0.85;
+      arm.rotation.y = rot;
+      g.add(arm);
+    }
+    const halo = new THREE.Mesh(
+      new THREE.TorusGeometry(0.5, 0.04, 8, 24),
+      new THREE.MeshStandardMaterial({ color: 0xef5350, emissive: 0xef5350, emissiveIntensity: 0.4 })
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = 0.35;
+    g.add(halo);
+    g.userData.medicHalo = halo;
+  } else if (def.kind === 'gun' || def.kind === 'rail' || def.kind === 'medgun') {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.7), baseMat);
     turret.add(head);
     for (const dx of [-0.18, 0.18]) {
@@ -57,7 +78,7 @@ function buildMesh(def) {
     crystal.position.set(0, 0.42, -0.12);
     turret.add(crystal);
     turret.userData.crystal = crystal;
-  } else if (def.kind === 'rocket' || def.kind === 'frostrkt' || def.kind === 'flak') {
+  } else if (def.kind === 'rocket' || def.kind === 'frostrkt' || def.kind === 'flak' || def.kind === 'stunbomb') {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.85), baseMat);
     turret.add(head);
     for (const dx of [-0.2, 0.2]) for (const dz of [-0.12, 0.22]) {
@@ -250,6 +271,32 @@ export class Tower {
   update(dt, now, enemies, game) {
     this.cooldown -= dt;
     const turret = this.mesh.userData.turret;
+
+    // 医疗系：治疗范围内受损最严重的防御塔（伤害值换成医疗值）
+    if (this.def.kind === 'medic' || this.def.kind === 'medgun') {
+      if (this.mesh.userData.medicHalo) this.mesh.userData.medicHalo.rotation.z += dt * 1.5;
+      if (this.cooldown <= 0) {
+        let target = null;
+        let worst = 1;
+        for (const t of game.towers) {
+          if (t === this || t.dead || t.hp >= t.maxHp) continue;
+          const dx = t.mesh.position.x - this.x;
+          const dz = t.mesh.position.z - this.z;
+          if (dx * dx + dz * dz > this.range * this.range) continue;
+          const r = t.hp / t.maxHp;
+          if (r < worst) { worst = r; target = t; }
+        }
+        if (target) {
+          this.cooldown = 1 / this.rate;
+          target.hp = Math.min(target.maxHp, target.hp + this.dmg);
+          game.effects.burst(target.mesh.position.clone().setY(1), 0x69f0ae, 6, 2, 0.4);
+          game.effects.ring(target.mesh.position.clone().setY(0.2), 0x69f0ae, 1.2, 0.35);
+          game.audio.repair();
+          if (game.selectedTower === target || game.selectedTower === this) game.showTowerPanel();
+        }
+      }
+      return;
+    }
     const slipped = this.slipUntil > now;
 
     // 滑倒状态：塔底显示香蕉皮

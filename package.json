@@ -1,6 +1,6 @@
 {
   "name": "tower-defense-3d",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "星际防线 3D —— 科幻风格 3D 塔防（4 种炮塔 / 20 波进攻）",
   "type": "module",
   "scripts": {
