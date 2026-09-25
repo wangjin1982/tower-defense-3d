@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星际防线 3D · 塔防</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="stylesheet" href="style.css?v=1.1">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <!-- 顶部状态栏 -->
+  <div id="topbar" class="hidden">
+    <div class="chip heart">❤️ <b id="lives">20</b></div>
+    <div class="chip gold">💰 <b id="gold">220</b></div>
+    <div class="chip wave">🌊 第 <b id="wave">1 / 20</b> 波</div>
+    <div class="chip diff" id="diff-chip">🟢 普通</div>
+    <div class="spacer"></div>
+    <button id="btn-speed" class="ctrl">⏩ 1x</button>
+    <button id="btn-pause" class="ctrl">⏸</button>
+    <button id="btn-mute" class="ctrl">🔊</button>
+  </div>
+
+  <!-- 底部建造栏 -->
+  <div id="buildbar" class="hidden"></div>
+
+  <!-- 放置提示 -->
+  <div id="ghost-hint" class="hidden"></div>
+  <button id="btn-cancel-build" class="ctrl cancel-build hidden">✕ 取消建造 (Esc)</button>
+
+  <!-- 波次按钮 -->
+  <div id="wave-cta" class="hidden">
+    <button id="btn-wave" class="primary pulse">▶ 开始第 1 波 (空格)</button>
+  </div>
+
+  <!-- 选中炮塔面板 -->
+  <div id="tower-panel" class="hidden">
+    <div class="tp-head">
+      <span id="tp-name">🔫 机枪塔 Lv.1</span>
+      <span id="tp-stars">⭐··</span>
+    </div>
+    <div id="tp-stats"></div>
+    <div class="tp-actions">
+      <button id="btn-fuse" class="primary fuse hidden">🧊 合体为冰冻炮</button>
+      <button id="btn-repair" class="repair hidden">🔧 修理</button>
+      <button id="btn-upgrade" class="primary">⬆ 升级</button>
+      <button id="btn-sell" class="danger">💵 出售</button>
+    </div>
+  </div>
+
+  <!-- 超级怪兽入场动画 -->
+  <div id="super-cine" class="hidden">
+    <div class="cine-banner">👹 超级怪兽来袭</div>
+    <div class="cine-sub">— 守住冰冻炮 —</div>
+  </div>
+
+  <!-- 中央公告 / 提示 / 受击闪光 -->
+  <div id="announce"></div>
+  <div id="toast"></div>
+  <div id="flash"></div>
+  <div id="hint" class="hidden">左键拖拽旋转 · 滚轮缩放 · 1-4 选塔 · 点击空地建造 · 空格开始波次 · Esc 取消</div>
+
+  <!-- 主菜单 -->
+  <div id="menu" class="overlay">
+    <div class="panel menu-panel">
+      <h1>🛡️ 星际防线 3D</h1>
+      <p class="subtitle">科幻塔防 · 无尽进攻 · 4 种炮塔 + 5 种合体</p>
+      <div class="row">
+        <span class="label">难度</span>
+        <div class="seg" id="seg-diff">
+          <button data-v="normal" class="selected">🟢 普通</button>
+          <button data-v="hard">🔴 困难</button>
+          <button data-v="hell">💀 地狱</button>
+        </div>
+      </div>
+      <p class="diff-desc" id="diff-desc">标准体验，适合熟悉玩法</p>
+      <div class="help">
+        <div class="help-title">玩法</div>
+        <div>敌人从 <b style="color:#ff5252">红色传送门</b> 出发，冲向 <b style="color:#69f0ae">绿色核心</b></div>
+        <div>在空地建造炮塔消灭它们，别让敌人抵达核心</div>
+        <div>击杀得金币 → 升级炮塔（每座可升 3 级）</div>
+        <div>⚠️ 困难/地狱难度会出现 <b style="color:#ffd740">金环精英怪</b>：血厚赏金高，突破防线代价更大</div>
+        <div>💀 地狱难度精英被击杀时会 <b style="color:#ff8a80">分裂成两只疾行者</b>，记得补防！</div>
+        <div>🛡️ 困难/地狱敌人 <b style="color:#b0bec5">披挂护甲</b>：每次受击减免固定伤害——机枪塔吃亏，狙击/火箭更可靠</div>
+        <div>🧡 每逢偶数波出现 <b style="color:#ff8a80">攻城兽</b>：抡大棒砸塔、扔手雷轰炸防御——塔有耐久，被摧毁后可在原地重建</div>
+        <div>🏍️🚗🚜 载具部队：<b>每 3 关摩托兵</b>（扔手雷拆塔）、<b>每 5 关香蕉车</b>（香蕉皮让塔滑倒，攻速减半 4 秒）、<b>每 7 关攻城坦克</b>（炮轰防御塔）</div>
+        <div>🧊💎🔷⚡💥 <b>合体系统</b>：相邻的两种满级塔花费金币合体，溅射覆盖三格——<br><b style="color:#4dd0e1">机枪+冰霜→冰冻炮</b> · <b style="color:#18ffff">火箭+冰霜→极寒火箭</b> · <b style="color:#5c6bc0">狙击+冰霜→冰晶狙击</b> · <b style="color:#b388ff">机枪+狙击→磁轨炮</b>（机炮攻速+狙击射程） · <b style="color:#ffd180">狙击+火箭→高射炮</b>（远程三格爆破）</div>
+        <div>🔧 塔耐久分 <b style="color:#76ff03">绿</b> / <b style="color:#ffd740">黄</b> / <b style="color:#ff5252">红</b> 三档（红=危急），<b>仅满级塔可花金币修理</b>（每次只修到下一个变色临界点）；升级即恢复满血</div>
+        <div>👹 <b style="color:#ff5252">任意合体塔在场</b>，下一波起都会引来超级怪兽（全属性强化+拆塔）；合体塔被毁则停止，直到下次合体</div>
+      </div>
+      <div class="help">
+        <div class="help-title">炮台</div>
+        <div>🔫 机枪塔 · 🎯 狙击塔 · ❄️ 冰霜塔（范围减速） · 🚀 火箭塔（溅射）</div>
+      </div>
+      <div class="help">
+        <div class="help-title">操作</div>
+        <div><b>1-4</b> 选塔 → 点击空地建造 · 点击炮塔查看/升级/出售</div>
+        <div><b>左键拖拽</b> 旋转视角 · <b>滚轮</b> 缩放 · <b>空格</b> 开始波次 · <b>P</b> 暂停</div>
+      </div>
+      <button id="btn-start" class="primary big">🚀 开始防御</button>
+    </div>
+  </div>
+
+  <!-- 结算 -->
+  <div id="gameover" class="overlay hidden">
+    <div class="panel menu-panel">
+      <h1 id="go-title">🏆 防线守住了！</h1>
+      <p class="subtitle" id="go-sub"></p>
+      <div id="go-stats"></div>
+      <div class="go-actions">
+        <button id="btn-restart" class="primary big">🔁 再来一局</button>
+        <button id="btn-menu" class="ctrl">🏠 回到主菜单</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js?v=1.1"></script>
+</body>
+</html>
