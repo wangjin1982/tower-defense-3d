@@ -105,8 +105,8 @@ export class UI {
     $('tp-stars').textContent = stars;
     $('tp-stats').innerHTML = `
       <div>伤害 <b>${info.dmg.toFixed(0)}</b></div>
-      <div>射程 <b>${info.range.toFixed(1)}</b></div>
-      <div>攻速 <b>${info.rate.toFixed(2)}/s</b></div>
+      <div>射程 <b>${info.effRange.toFixed(1)}</b></div>
+      <div>攻速 <b>${info.effRate.toFixed(2)}/s</b></div>
       <div>耐久 <b style="color:${BAND_COLORS[info.band.key]}">${Math.max(0, Math.round(info.hp))}/${info.maxHp}</b>（${info.band.name}）</div>
       <div>击杀 <b>${info.kills}</b></div>`;
     // 修理按钮：耐久不在绿色区时出现，只修到下一个变色临界点

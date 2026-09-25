@@ -92,6 +92,8 @@ export class Game {
     this.waveIndex = 0;
     this.waveActive = false;
     this.superAggro = false; // 冰冻炮仇恨状态（合体点亮 / 冰冻炮被毁解除）
+    this.rewardStacks = { rate: 0, range: 0, def: 0, stun: 0 }; // Boss 击杀隐藏奖励层数
+    this.rewardMult = { rate: 1, range: 1, def: 0, stun: 0 };   // 奖励生效倍率
     this.spawnQueue = [];
     this.audio.ensure();
     this.ui.setPauseText(false);
@@ -131,6 +133,7 @@ export class Game {
     if (this.gold < def.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return false; }
     this.gold -= def.cost;
     const tower = new Tower(key, col, row, this.scene, cellToWorld);
+    tower.game = this;
     tower.setLevelVisual();
     this.towers.push(tower);
     this.grid.set(cellKey, tower);
@@ -156,7 +159,7 @@ export class Game {
     const t = this.selectedTower;
     if (!t) return;
     this.ui.showTowerPanel({
-      def: t.def, level: t.level, dmg: t.dmg, range: t.range, rate: t.rate,
+      def: t.def, level: t.level, dmg: t.dmg, range: t.effRange, rate: t.effRate,
       kills: t.kills || 0, nextCost: t.nextUpgradeCost, sellValue: t.sellValue,
       hp: t.hp, maxHp: t.maxHp, fuse: this.getFuseInfo(t),
       band: t.band, repair: t.repairInfo,
@@ -227,6 +230,7 @@ export class Game {
     }
     const fused = new Tower(recipe.result, col, row, this.scene, cellToWorld);
     fused.invested = invested;
+    fused.game = this;
     fused.setLevelVisual();
     this.towers.push(fused);
     this.grid.set(`${col},${row}`, fused);
@@ -359,6 +363,7 @@ export class Game {
     this.gold += enemy.bounty;
     this.goldEarned += enemy.bounty;
     this.kills += 1;
+    if (enemy.def.key === 'boss') this.grantBossReward(); // 击杀 BOSS：随机隐藏奖励
     if (tower) tower.kills = (tower.kills || 0) + 1;
     if (this.selectedTower) this.showTowerPanel();
     this.audio.kill();
@@ -539,8 +544,20 @@ export class Game {
     this.audio.grenadeThrow();
   }
 
+  // ===== Boss 击杀随机奖励（隐藏 buff，逐层叠加，跨波保留） =====
+  grantBossReward() {
+    const pool = ['rate', 'range', 'def', 'stun'];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    this.rewardStacks[pick] += 1;
+    this.rewardMult.rate = 1 + 0.2 * this.rewardStacks.rate;   // 全体攻速 +20%/层
+    this.rewardMult.range = 1 + 0.2 * this.rewardStacks.range; // 全体射程 +20%/层
+    this.rewardMult.def = this.rewardStacks.def;               // 塔受伤 ×0.8/层
+    this.rewardMult.stun = 2 * this.rewardStacks.stun;         // 火箭塔眩晕 2 秒/层
+  }
+
   damageTower(tower, dmg) {
     if (tower.dead || this.state !== 'playing') return;
+    dmg *= Math.pow(0.8, this.rewardMult.def); // 防御奖励：塔受伤减免
     tower.hp -= dmg;
     this.effects.burst(tower.mesh.position.clone().setY(1), 0xff5252, 4, 2, 0.3);
     if (tower.hp <= 0) {
@@ -597,6 +614,7 @@ export class Game {
       this.ghostRing.material.color.setHex(affordable ? 0x69f0ae : 0xff5252);
       this.ghostRing.geometry.dispose();
       this.ghostRing.geometry = new THREE.RingGeometry(def.range - 0.05, def.range, 48);
+      this.ghostRing.scale.setScalar(this.rewardMult.range);
     }
   }
 

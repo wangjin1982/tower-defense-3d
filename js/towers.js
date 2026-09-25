@@ -127,6 +127,7 @@ export class Tower {
     this.maxHp = Math.round(this.def.hp * (1 + (this.level - 1) * 0.35));
     this.hp = this.maxHp;
     this.slipUntil = 0; // 香蕉皮滑倒截止时间（攻速减半）
+    this.game = null;   // 由 game 在创建后回填（奖励加成读取用）
 
     // 耐久条（受损时显示）
     this.bar = new THREE.Group();
@@ -255,14 +256,19 @@ export class Tower {
     return true;
   }
 
+  // Boss 奖励加成（rewardMult 由 game 维护）
+  get effRange() { return this.range * (this.game?.rewardMult?.range ?? 1); }
+  get effRate() { return this.rate * (this.game?.rewardMult?.rate ?? 1); }
+
   // 返回射程内“走得最远”的敌人
   findTarget(enemies) {
+    const range = this.effRange;
     let best = null;
     for (const e of enemies) {
       if (!e.alive) continue;
       const dx = e.mesh.position.x - this.x;
       const dz = e.mesh.position.z - this.z;
-      if (dx * dx + dz * dz > this.range * this.range) continue;
+      if (dx * dx + dz * dz > range * range) continue;
       if (!best || e.dist > best.dist) best = e;
     }
     return best;
@@ -298,6 +304,9 @@ export class Tower {
       return;
     }
     const slipped = this.slipUntil > now;
+
+    // 射程圈随 Boss 奖励缩放
+    this.rangeRing.scale.setScalar(this.effRange / this.range);
 
     // 滑倒状态：塔底显示香蕉皮
     if (slipped) {
@@ -345,10 +354,10 @@ export class Tower {
           if (!e.alive) continue;
           const dx = e.mesh.position.x - this.x;
           const dz = e.mesh.position.z - this.z;
-          if (dx * dx + dz * dz <= this.range * this.range) targets.push(e);
+          if (dx * dx + dz * dz <= this.effRange * this.effRange) targets.push(e);
         }
         if (targets.length > 0) {
-          this.cooldown = (1 / this.rate) * (slipped ? 2 : 1);
+          this.cooldown = (1 / this.effRate) * (slipped ? 2 : 1);
           for (const e of targets) {
             if (e.takeDamage(this.dmg)) game.onEnemyKilled(e, this);
             e.applySlow(this.def.slow, this.def.slowTime, now);
@@ -373,7 +382,7 @@ export class Tower {
       this.aimYaw += diff * Math.min(1, dt * 10);
       turret.rotation.y = this.aimYaw;
       if (this.cooldown <= 0) {
-        this.cooldown = (1 / this.rate) * (slipped ? 2 : 1);
+        this.cooldown = (1 / this.effRate) * (slipped ? 2 : 1);
         const muzzle = new THREE.Vector3(0, 0.55, 0.7).applyAxisAngle(
           new THREE.Vector3(0, 1, 0), this.aimYaw
         ).add(this.mesh.position);

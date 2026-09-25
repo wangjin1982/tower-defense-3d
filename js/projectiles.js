@@ -121,8 +121,11 @@ export class Projectile {
           if (d <= this.splash) {
             const falloff = 1 - (d / this.splash) * 0.5;
             if (e.takeDamage(this.dmg * falloff)) game.onEnemyKilled(e, this.tower);
-            // 冻结：冰冻系炮台溅射范围内的敌人被减速
             if (freezes) e.applySlow(this.tower.def.slow, this.tower.def.slowTime, game.now);
+            // 火箭炮 Boss 奖励：眩晕（完全定身）
+            if (this.kind === 'rocket' && game.rewardMult.stun > 0) {
+              e.applySlow(1.0, game.rewardMult.stun, game.now);
+            }
             if (stuns) e.applySlow(1.0, this.tower.def.stun, game.now); // 眩晕：完全定身
           }
         }
