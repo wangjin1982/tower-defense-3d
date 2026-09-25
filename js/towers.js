@@ -1,6 +1,6 @@
 // ===== 炮塔 =====
 import * as THREE from 'three';
-import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=1.1';
+import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.2';
 
 function buildMesh(def) {
   const g = new THREE.Group();
@@ -78,7 +78,7 @@ function buildMesh(def) {
     crystal.position.set(0, 0.42, -0.12);
     turret.add(crystal);
     turret.userData.crystal = crystal;
-  } else if (def.kind === 'rocket' || def.kind === 'frostrkt' || def.kind === 'flak' || def.kind === 'stunbomb') {
+  } else if (def.kind === 'rocket' || def.kind === 'frostrkt' || def.kind === 'flak') {
     const head = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.5, 0.85), baseMat);
     turret.add(head);
     for (const dx of [-0.2, 0.2]) for (const dz of [-0.12, 0.22]) {
@@ -128,6 +128,8 @@ export class Tower {
     this.hp = this.maxHp;
     this.slipUntil = 0; // 香蕉皮滑倒截止时间（攻速减半）
     this.game = null;   // 由 game 在创建后回填（奖励加成读取用）
+    this.beams = [];    // 五角星光束（视觉）
+    this.beamAngle = 0;
 
     // 耐久条（受损时显示）
     this.bar = new THREE.Group();
@@ -260,16 +262,22 @@ export class Tower {
   get effRange() { return this.range * (this.game?.rewardMult?.range ?? 1); }
   get effRate() { return this.rate * (this.game?.rewardMult?.rate ?? 1); }
 
-  // 返回射程内“走得最远”的敌人
+  // 返回射程内的目标：默认选走得最远的敌人；strongest 模式锁定最强敌人（加特林）
   findTarget(enemies) {
     const range = this.effRange;
+    const strongest = this.def.targetMode === 'strongest';
     let best = null;
     for (const e of enemies) {
       if (!e.alive) continue;
       const dx = e.mesh.position.x - this.x;
       const dz = e.mesh.position.z - this.z;
       if (dx * dx + dz * dz > range * range) continue;
-      if (!best || e.dist > best.dist) best = e;
+      if (!best) { best = e; continue; }
+      if (strongest) {
+        if (e.maxHp > best.maxHp || (e.maxHp === best.maxHp && e.hp > best.hp)) best = e;
+      } else if (e.dist > best.dist) {
+        best = e;
+      }
     }
     return best;
   }
@@ -277,6 +285,57 @@ export class Tower {
   update(dt, now, enemies, game) {
     this.cooldown -= dt;
     const turret = this.mesh.userData.turret;
+
+    // 五角星：五向激光，光束扫到的防御塔被治疗
+    if (this.def.kind === 'penta') {
+      if (this.cooldown <= 0) {
+        this.cooldown = 1 / this.rate;
+        this.beamAngle += 0.4; // 每次发射整体旋转
+        const healed = new Set();
+        for (let i = 0; i < 5; i++) {
+          const ang = this.beamAngle + (i * Math.PI * 2) / 5;
+          const dx = Math.cos(ang), dz = Math.sin(ang);
+          // 光束视觉：细长条
+          const len = this.effRange;
+          const beam = new THREE.Mesh(
+            new THREE.BoxGeometry(0.07, 0.07, len),
+            new THREE.MeshBasicMaterial({ color: 0x69f0ae, transparent: true, opacity: 0.85 })
+          );
+          beam.position.set(this.x + dx * len / 2, 0.9, this.z + dz * len / 2);
+          beam.rotation.y = Math.atan2(dx, dz);
+          game.scene.add(beam);
+          this.beams.push({ mesh: beam, age: 0, life: 0.3 });
+          // 治疗：光束走廊内的塔（含自身以外的所有受损塔）
+          for (const t of game.towers) {
+            if (t === this || t.dead || t.hp >= t.maxHp || healed.has(t.id)) continue;
+            const vx = t.mesh.position.x - this.x;
+            const vz = t.mesh.position.z - this.z;
+            const proj = vx * dx + vz * dz;
+            if (proj < 0.5 || proj > this.effRange) continue;
+            if (Math.abs(vx * dz - vz * dx) <= 0.9) {
+              t.hp = Math.min(t.maxHp, t.hp + this.dmg);
+              healed.add(t.id);
+              game.effects.burst(t.mesh.position.clone().setY(1), 0x69f0ae, 4, 1.8, 0.35);
+              if (game.selectedTower === t) game.showTowerPanel();
+            }
+          }
+        }
+        game.audio.repair();
+      }
+      // 光束衰减
+      for (let i = this.beams.length - 1; i >= 0; i--) {
+        const b = this.beams[i];
+        b.age += dt;
+        b.mesh.material.opacity = 0.85 * Math.max(0, 1 - b.age / b.life);
+        if (b.age >= b.life) {
+          game.scene.remove(b.mesh);
+          b.mesh.geometry.dispose();
+          b.mesh.material.dispose();
+          this.beams.splice(i, 1);
+        }
+      }
+      return;
+    }
 
     // 医疗系：治疗范围内受损最严重的防御塔（伤害值换成医疗值）
     if (this.def.kind === 'medic' || this.def.kind === 'medgun') {
@@ -392,6 +451,11 @@ export class Tower {
   }
 
   dispose(scene) {
+    for (const b of this.beams || []) {
+      scene.remove(b.mesh);
+      b.mesh.geometry.dispose();
+      b.mesh.material.dispose();
+    }
     scene.remove(this.mesh);
     scene.remove(this.rangeRing);
     this.mesh.traverse((o) => {

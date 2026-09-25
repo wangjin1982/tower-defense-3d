@@ -1,7 +1,7 @@
 // ===== 敌人 =====
 import * as THREE from 'three';
-import { ENEMIES, TILE } from './config.js?v=1.1';
-import { pathWaypoints } from './map.js?v=1.1';
+import { ENEMIES, TILE } from './config.js?v=2.2';
+import { pathWaypoints } from './map.js?v=2.2';
 
 // 全局共享：路径长度与累计里程（所有敌人同一条路）
 const WPS = pathWaypoints();

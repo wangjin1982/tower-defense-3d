@@ -74,11 +74,16 @@ export const TOWERS = {
     key: 'medgun', name: '战地维修', icon: '⛑️', desc: '合体炮塔：高速维修前线',
     cost: 200, dmg: 12, range: 5.5, rate: 2.5, color: 0x80cbc4, kind: 'medgun', hp: 120, fusion: true,
   },
-  // 💤 麻醉炮：火箭塔 + 医疗塔合体产物（大面积眩晕）
-  stunbomb: {
-    key: 'stunbomb', name: '麻醉炮', icon: '💤', desc: '合体炮塔：大面积眩晕敌人',
-    cost: 230, dmg: 10, range: 6.5, rate: 0.45, color: 0x9575cd, kind: 'stunbomb',
-    splash: 3.0, bulletSpeed: 9, launchSpeed: 3, accel: 7, stun: 0.9, slow: 0.5, slowTime: 1.5, hp: 105, fusion: true,
+  // 💫 加特林：火箭塔 + 医疗塔合体产物（锁定最强敌人，持续眩晕）
+  gatling: {
+    key: 'gatling', name: '加特林', icon: '💫', desc: '合体炮塔：锁定最强敌人并持续眩晕',
+    cost: 250, dmg: 15, range: 6.5, rate: 4.0, color: 0xce93d8, kind: 'gatling',
+    bulletSpeed: 26, stun: 0.45, hp: 105, fusion: true, targetMode: 'strongest',
+  },
+  // ⭐ 五角星：冰霜塔 + 医疗塔合体产物（五向激光治疗）
+  penta: {
+    key: 'penta', name: '五角星', icon: '⭐', desc: '合体炮塔：五向激光治疗防御塔',
+    cost: 210, dmg: 14, range: 6.0, rate: 0.8, color: 0x69f0ae, kind: 'penta', hp: 105, fusion: true,
   },
 };
 // 合体：相邻且均为满级的两座塔，花费金币合体
@@ -93,7 +98,8 @@ export const FUSION_RECIPES = [
   { a: 'gun', b: 'sniper', result: 'rail', cost: 260, label: '⚡ 合体为磁轨炮' },
   { a: 'sniper', b: 'rocket', result: 'flak', cost: 280, label: '💥 合体为高射炮' },
   { a: 'medic', b: 'gun', result: 'medgun', cost: 200, label: '⛑️ 合体为战地维修' },
-  { a: 'medic', b: 'rocket', result: 'stunbomb', cost: 230, label: '💤 合体为麻醉炮' },
+  { a: 'medic', b: 'rocket', result: 'gatling', cost: 250, label: '💫 合体为加特林' },
+  { a: 'medic', b: 'frost', result: 'penta', cost: 210, label: '⭐ 合体为五角星' },
 ];
 
 // 升级：每级伤害 ×1.55，射程 ×1.12，攻速 ×1.15
