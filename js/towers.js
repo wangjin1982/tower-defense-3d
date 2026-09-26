@@ -1,6 +1,6 @@
 // ===== 炮塔 =====
 import * as THREE from 'three';
-import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.6';
+import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.7';
 
 function buildMesh(def) {
   const g = new THREE.Group();

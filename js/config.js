@@ -38,7 +38,7 @@ export const TOWERS = {
   cryo: {
     key: 'cryo', name: '冰冻炮', icon: '🧊', desc: '合体炮塔：高伤冻结溅射',
     cost: 180, dmg: 38, range: 6.4, rate: 1.35, color: 0x4dd0e1, kind: 'cryo',
-    splash: 3.0, bulletSpeed: 14, slow: 0.5, slowTime: 1.2, hp: 130, fusion: true,
+    splash: 2.5, bulletSpeed: 14, slow: 0.4, slowTime: 1.2, hp: 130, fusion: true,
   },
   // 极寒火箭：火箭塔 + 冰霜塔合体产物
   frostrkt: {
@@ -78,17 +78,17 @@ export const TOWERS = {
   gatling: {
     key: 'gatling', name: '加特林', icon: '💫', desc: '合体炮塔：锁定最强敌人并持续眩晕',
     cost: 250, dmg: 15, range: 6.5, rate: 4.0, color: 0xce93d8, kind: 'gatling',
-    bulletSpeed: 26, stun: 0.45, hp: 105, fusion: true, targetMode: 'strongest',
+    bulletSpeed: 26, stun: 0.22, hp: 105, fusion: true, targetMode: 'strongest',
   },
   // ⭐ 五角星：冰霜塔 + 医疗塔合体产物（五向激光治疗）
   penta: {
-    key: 'penta', name: '五角星', icon: '⭐', desc: '合体炮塔：五向激光治疗防御塔',
-    cost: 210, dmg: 14, range: 6.0, rate: 0.8, color: 0x69f0ae, kind: 'penta', hp: 105, fusion: true,
+    key: 'penta', name: '五角星', icon: '⭐', desc: '合体炮塔：五向激光群体治疗',
+    cost: 150, dmg: 20, range: 6.0, rate: 0.8, color: 0x69f0ae, kind: 'penta', hp: 105, fusion: true,
   },
   // 🌠 超级加农炮：五角星 + 冰霜塔合体产物（直线贯穿光炮）
   cannon: {
     key: 'cannon', name: '超级加农炮', icon: '🌠', desc: '合体炮塔：直线贯穿全部敌人',
-    cost: 320, dmg: 55, range: 13, rate: 0.55, color: 0x00e5ff, kind: 'cannon',
+    cost: 320, dmg: 80, range: 13, rate: 0.55, color: 0x00e5ff, kind: 'cannon',
     beamWidth: 1.6, hp: 125, fusion: true,
   },
 };
@@ -105,7 +105,7 @@ export const FUSION_RECIPES = [
   { a: 'sniper', b: 'rocket', result: 'flak', cost: 280, label: '💥 合体为高射炮' },
   { a: 'medic', b: 'gun', result: 'medgun', cost: 200, label: '⛑️ 合体为战地维修' },
   { a: 'medic', b: 'rocket', result: 'gatling', cost: 250, label: '💫 合体为加特林' },
-  { a: 'medic', b: 'frost', result: 'penta', cost: 210, label: '⭐ 合体为五角星' },
+  { a: 'medic', b: 'frost', result: 'penta', cost: 150, label: '⭐ 合体为五角星' },
   { a: 'penta', b: 'frost', result: 'cannon', cost: 320, label: '🌠 合体为超级加农炮' },
 ];
 

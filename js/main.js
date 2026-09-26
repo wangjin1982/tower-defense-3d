@@ -1,12 +1,12 @@
 // ===== 入口：渲染器、灯光、主循环 =====
 import * as THREE from 'three';
-import { buildMap } from './map.js?v=2.6';
-import { AudioFX } from './audio.js?v=2.6';
-import { Effects } from './effects.js?v=2.6';
-import { UI } from './ui.js?v=2.6';
-import { Game } from './game.js?v=2.6';
-import { InputController } from './input.js?v=2.6';
-import { BUILDABLE_KEYS } from './config.js?v=2.6';
+import { buildMap } from './map.js?v=2.7';
+import { AudioFX } from './audio.js?v=2.7';
+import { Effects } from './effects.js?v=2.7';
+import { UI } from './ui.js?v=2.7';
+import { Game } from './game.js?v=2.7';
+import { InputController } from './input.js?v=2.7';
+import { BUILDABLE_KEYS } from './config.js?v=2.7';
 
 const $ = (id) => document.getElementById(id);
 
