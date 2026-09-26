@@ -1,6 +1,6 @@
 // ===== 炮塔 =====
 import * as THREE from 'three';
-import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.3';
+import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.4';
 
 function buildMesh(def) {
   const g = new THREE.Group();
@@ -24,7 +24,24 @@ function buildMesh(def) {
   turret.position.y = 0.55;
   g.add(turret);
 
-  if (def.kind === 'medic') {
+  if (def.kind === 'cannon') {
+    // 超级加农炮：巨型双管 + 充能环
+    const megaMat = new THREE.MeshStandardMaterial({ color: 0x37474f, roughness: 0.4, metalness: 0.6 });
+    const glowMat = new THREE.MeshStandardMaterial({ color: def.color, emissive: def.color, emissiveIntensity: 0.6 });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 1.0), megaMat);
+    turret.add(head);
+    for (const dx of [-0.24, 0.24]) {
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 1.3, 10), glowMat);
+      barrel.rotation.x = Math.PI / 2;
+      barrel.position.set(dx, 0, 0.75);
+      turret.add(barrel);
+    }
+    const chargeRing = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.06, 10, 28), glowMat);
+    chargeRing.rotation.x = Math.PI / 2;
+    chargeRing.position.y = 0.45;
+    turret.add(chargeRing);
+    turret.userData.chargeRing = chargeRing;
+  } else if (def.kind === 'medic') {
     // 医疗塔：白色底座 + 红十字 + 悬浮加号
     const crossMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
     const redMat = new THREE.MeshStandardMaterial({ color: 0xef5350, emissive: 0xef5350, emissiveIntensity: 0.25 });
@@ -285,6 +302,58 @@ export class Tower {
   update(dt, now, enemies, game) {
     this.cooldown -= dt;
     const turret = this.mesh.userData.turret;
+
+    // 超级加农炮：充能环旋转；开火时对一条直线上的所有敌人造成伤害
+    if (this.def.kind === 'cannon') {
+      if (turret.userData.chargeRing) turret.userData.chargeRing.rotation.z += dt * 3;
+      if (this.cooldown <= 0) {
+        const target = this.findTarget(enemies);
+        if (target) {
+          this.cooldown = 1 / this.effRate;
+          const dx = target.mesh.position.x - this.x;
+          const dz = target.mesh.position.z - this.z;
+          const len = Math.hypot(dx, dz);
+          const ux = dx / len, uz = dz / len;
+          const beamLen = this.effRange;
+          const beam = new THREE.Mesh(
+            new THREE.BoxGeometry(this.def.beamWidth, 0.3, beamLen),
+            new THREE.MeshBasicMaterial({ color: this.def.color, transparent: true, opacity: 0.75 })
+          );
+          beam.position.set(this.x + ux * beamLen / 2, 0.8, this.z + uz * beamLen / 2);
+          beam.rotation.y = Math.atan2(ux, uz);
+          game.scene.add(beam);
+          this.beams.push({ mesh: beam, age: 0, life: 0.35 });
+          game.effects.burst(new THREE.Vector3(this.x + ux * 1.2, 0.8, this.z + uz * 1.2), this.def.color, 8, 3, 0.3);
+          game.audio.explode();
+          // 直线伤害：光束走廊内全部敌人
+          for (const e of enemies) {
+            if (!e.alive) continue;
+            const vx = e.mesh.position.x - this.x;
+            const vz = e.mesh.position.z - this.z;
+            const proj = vx * ux + vz * uz;
+            if (proj < 0.5 || proj > beamLen) continue;
+            if (Math.abs(vx * uz - vz * ux) <= this.def.beamWidth / 2 + 0.4) {
+              if (e.takeDamage(this.dmg)) game.onEnemyKilled(e, this);
+              game.effects.burst(e.mesh.position.clone().setY(0.8), this.def.color, 4, 2, 0.3);
+            }
+          }
+          if (game.selectedTower === this) game.showTowerPanel();
+        }
+      }
+      // 光束衰减
+      for (let i = this.beams.length - 1; i >= 0; i--) {
+        const b = this.beams[i];
+        b.age += dt;
+        b.mesh.material.opacity = 0.75 * Math.max(0, 1 - b.age / b.life);
+        if (b.age >= b.life) {
+          game.scene.remove(b.mesh);
+          b.mesh.geometry.dispose();
+          b.mesh.material.dispose();
+          this.beams.splice(i, 1);
+        }
+      }
+      return;
+    }
 
     // 五角星：五向激光，光束扫到的防御塔被治疗
     if (this.def.kind === 'penta') {

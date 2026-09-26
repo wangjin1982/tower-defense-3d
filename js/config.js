@@ -85,6 +85,12 @@ export const TOWERS = {
     key: 'penta', name: '五角星', icon: '⭐', desc: '合体炮塔：五向激光治疗防御塔',
     cost: 210, dmg: 14, range: 6.0, rate: 0.8, color: 0x69f0ae, kind: 'penta', hp: 105, fusion: true,
   },
+  // 🌠 超级加农炮：五角星 + 冰霜塔合体产物（直线贯穿光炮）
+  cannon: {
+    key: 'cannon', name: '超级加农炮', icon: '🌠', desc: '合体炮塔：直线贯穿全部敌人',
+    cost: 320, dmg: 55, range: 13, rate: 0.55, color: 0x00e5ff, kind: 'cannon',
+    beamWidth: 1.6, hp: 125, fusion: true,
+  },
 };
 // 合体：相邻且均为满级的两座塔，花费金币合体
 export const FUSION_COST = 180;
@@ -100,6 +106,7 @@ export const FUSION_RECIPES = [
   { a: 'medic', b: 'gun', result: 'medgun', cost: 200, label: '⛑️ 合体为战地维修' },
   { a: 'medic', b: 'rocket', result: 'gatling', cost: 250, label: '💫 合体为加特林' },
   { a: 'medic', b: 'frost', result: 'penta', cost: 210, label: '⭐ 合体为五角星' },
+  { a: 'penta', b: 'frost', result: 'cannon', cost: 320, label: '🌠 合体为超级加农炮' },
 ];
 
 // 升级：每级伤害 ×1.55，射程 ×1.12，攻速 ×1.15

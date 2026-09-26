@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import {
   TOTAL_WAVES, TOWERS, TOWER_KEYS, DIFFICULTIES, makeWaves, buildWave, stageBoost, STAGE_LEVEL,
   MAX_LEVEL, FUSION_RECIPES,
-} from './config.js?v=2.3';
-import { cellToWorld, isBuildable } from './map.js?v=2.3';
-import { Enemy, PATH_TOTAL } from './enemies.js?v=2.3';
-import { Tower } from './towers.js?v=2.3';
-import { Projectile, Grenade, Peel } from './projectiles.js?v=2.3';
+} from './config.js?v=2.4';
+import { cellToWorld, isBuildable } from './map.js?v=2.4';
+import { Enemy, PATH_TOTAL } from './enemies.js?v=2.4';
+import { Tower } from './towers.js?v=2.4';
+import { Projectile, Grenade, Peel } from './projectiles.js?v=2.4';
 
 export class Game {
   constructor({ scene, camera, audio, effects, ui }) {

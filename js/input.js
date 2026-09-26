@@ -1,6 +1,6 @@
 // ===== 输入：轨道相机 + 格子拾取 =====
 import * as THREE from 'three';
-import { worldToCell } from './map.js?v=2.3';
+import { worldToCell } from './map.js?v=2.4';
 
 export class InputController {
   constructor(dom, camera, handlers) {
