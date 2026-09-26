@@ -1,6 +1,6 @@
 // ===== 地图：格子换算、路径、场景搭建 =====
 import * as THREE from 'three';
-import { TILE, COLS, ROWS, PATH_CELLS } from './config.js?v=2.2';
+import { TILE, COLS, ROWS, PATH_CELLS } from './config.js?v=2.3';
 
 const pathSet = new Set(PATH_CELLS.map(([c, r]) => `${c},${r}`));
 

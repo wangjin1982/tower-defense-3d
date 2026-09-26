@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import {
   TOTAL_WAVES, TOWERS, TOWER_KEYS, DIFFICULTIES, makeWaves, buildWave, stageBoost, STAGE_LEVEL,
   MAX_LEVEL, FUSION_RECIPES,
-} from './config.js?v=2.2';
-import { cellToWorld, isBuildable } from './map.js?v=2.2';
-import { Enemy, PATH_TOTAL } from './enemies.js?v=2.2';
-import { Tower } from './towers.js?v=2.2';
-import { Projectile, Grenade, Peel } from './projectiles.js?v=2.2';
+} from './config.js?v=2.3';
+import { cellToWorld, isBuildable } from './map.js?v=2.3';
+import { Enemy, PATH_TOTAL } from './enemies.js?v=2.3';
+import { Tower } from './towers.js?v=2.3';
+import { Projectile, Grenade, Peel } from './projectiles.js?v=2.3';
 
 export class Game {
   constructor({ scene, camera, audio, effects, ui }) {
@@ -413,6 +413,21 @@ export class Game {
     const dt = rawDt * this.speed;
     this.cinematicT = Math.max(0, (this.cinematicT || 0) - rawDt);
     const gameDt = this.cinematicT > 0 ? dt * 0.35 : dt; // 超级怪兽入场慢镜头
+    // Boss 奖励横幅动画
+    if (this.rewardSprite) {
+      const rs = this.rewardSprite;
+      rs.age += rawDt;
+      const k = rs.age / rs.life;
+      if (k >= 1) {
+        this.scene.remove(rs.sprite);
+        rs.sprite.material.map.dispose();
+        rs.sprite.material.dispose();
+        this.rewardSprite = null;
+      } else {
+        rs.sprite.material.opacity = k < 0.12 ? k / 0.12 : (k > 0.8 ? Math.max(0, (1 - k) / 0.2) : 1);
+      }
+    }
+
     // 场景内横幅动画（实时播放，不受慢镜头影响）
     if (this.cineSprite) {
       const cs = this.cineSprite;
@@ -553,6 +568,42 @@ export class Game {
     this.rewardMult.range = 1 + 0.2 * this.rewardStacks.range; // 全体射程 +20%/层
     this.rewardMult.def = this.rewardStacks.def;               // 塔受伤 ×0.8/层
     this.rewardMult.stun = 2 * this.rewardStacks.stun;         // 火箭塔眩晕 2 秒/层
+    this._showRewardBanner(pick, this.rewardStacks[pick]);
+  }
+
+  // Boss 奖励揭晓横幅：金色 Sprite 渲染进场景（录屏可见），带层数提示
+  _showRewardBanner(pick, stacks) {
+    const defs = {
+      rate: { title: '🎁 射击速度提升', sub: `全体攻速 +20%（当前 +${20 * stacks}%）` },
+      range: { title: '🎁 攻击范围提升', sub: `全体射程 +20%（当前 +${20 * stacks}%）` },
+      def: { title: '🎁 防御力提升', sub: `塔受损 -20%（当前 -${20 * stacks}%）` },
+      stun: { title: '🎁 火箭强化', sub: `火箭眩晕 ${2 * stacks} 秒` },
+    };
+    const d = defs[pick];
+    const cv = document.createElement('canvas');
+    cv.width = 1024; cv.height = 240;
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = 'rgba(35, 30, 5, 0.42)';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.textAlign = 'center';
+    ctx.shadowColor = 'rgba(255, 215, 64, 0.95)';
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = '#ffd740';
+    ctx.font = '900 88px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(d.title, 512, 108);
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#fff8e1';
+    ctx.font = '600 42px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(d.sub, 512, 200);
+    const tex = new THREE.CanvasTexture(cv);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, opacity: 0, depthWrite: false,
+    }));
+    sprite.position.set(0, 6.5, 0);
+    sprite.scale.set(12, 2.8, 1);
+    sprite.renderOrder = 50;
+    this.scene.add(sprite);
+    this.rewardSprite = { sprite, age: 0, life: 2.4 };
   }
 
   damageTower(tower, dmg) {

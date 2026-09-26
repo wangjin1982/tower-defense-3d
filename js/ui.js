@@ -1,5 +1,5 @@
 // ===== UI 层（DOM） =====
-import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.2';
+import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.3';
 
 const BAND_COLORS = { red: '#ff5252', yellow: '#ffd740', green: '#76ff03' };
 
