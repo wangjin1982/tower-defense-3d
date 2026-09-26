@@ -2,8 +2,7 @@
 import * as THREE from 'three';
 import {
   TOTAL_WAVES, TOWERS, TOWER_KEYS, DIFFICULTIES, makeWaves, buildWave, stageBoost, STAGE_LEVEL,
-  MAX_LEVEL, FUSION_RECIPES,
-} from './config.js?v=2.8';
+  MAX_LEVEL, FUSION_RECIPES, COLS } from './config.js?v=2.8';
 import { cellToWorld, isBuildable } from './map.js?v=2.8';
 import { Enemy, PATH_TOTAL } from './enemies.js?v=2.8';
 import { setMap as setMapModule, activeMapKey } from './map.js?v=2.8';
@@ -94,6 +93,10 @@ export class Game {
     setMapModule(this.mapKey);
     this.pathCount = MAPS[this.mapKey].paths.length;
     initEnemyPaths(this.mapKey, this.pathCount);
+    if (this.rebuildMap && this._lastMapKey !== this.mapKey) {
+      this._lastMapKey = this.mapKey;
+      this.rebuildMap(this.mapKey);
+    }
     this.players = this.pathCount > 1
       ? Array.from({ length: this.pathCount }, (_, i) => ({ gold: this.diff.startGold, name: `P${i + 1}` }))
       : [{ gold: this.diff.startGold, name: 'P1' }];
@@ -138,13 +141,40 @@ export class Game {
   // ===== 建造 =====
   onSelectBuild(key) { this.buildKey = key; }
 
+  // 双人模式：格子归属玩家（上路 P1 / 下路 P2 / 中间按列分）
+  _playerForCell(col, row) {
+    if (this.players.length === 1) return 0;
+    if (row <= 2) return 0;
+    if (row >= 6) return 1;
+    return col < COLS / 2 ? 0 : 1;
+  }
+
+  _spend(cost, col, row) {
+    const pi = this._playerForCell(col, row);
+    const p = this.players[pi];
+    if (p.gold < cost) { this.audio.error(); this.ui.toast(`💰 P${pi + 1} 金币不足`); return false; }
+    p.gold -= cost;
+    return true;
+  }
+
+  _earn(amount, col, row) {
+    if (this.players.length === 1) { this.gold += amount; this.goldEarned += amount; return; }
+    const pi = (col == null) ? 0 : this._playerForCell(Math.round(col), Math.round(row));
+    this.players[pi].gold += amount;
+    this.goldEarned += amount;
+  }
+
   placeTower(key, col, row) {
     const def = TOWERS[key];
     if (!def) return false;
     const cellKey = `${col},${row}`;
     if (this.grid.has(cellKey) || !isBuildable(col, row)) return false;
-    if (this.gold < def.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return false; }
-    this.gold -= def.cost;
+    if (this.players.length > 1) {
+      if (!this._spend(def.cost, col, row)) return false;
+    } else {
+      if (this.gold < def.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return false; }
+      this.gold -= def.cost;
+    }
     const tower = new Tower(key, col, row, this.scene, cellToWorld);
     tower.game = this;
     tower.setLevelVisual();
@@ -190,8 +220,12 @@ export class Game {
     }
     const info = t.repairInfo;
     if (!info) { this.audio.error(); return; }
-    if (this.gold < info.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
-    this.gold -= info.cost;
+    if (this.players.length > 1) {
+      if (!this._spend(info.cost, t.col, t.row)) return;
+    } else {
+      if (this.gold < info.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
+      this.gold -= info.cost;
+    }
     t.repair();
     this.audio.repair();
     this.effects.burst(new THREE.Vector3(t.x, 1, t.z), 0x76ff03, 10, 2.5, 0.5);
@@ -224,7 +258,12 @@ export class Game {
     if (!t) return;
     const info = this.getFuseInfo(t);
     if (!info) { this.audio.error(); return; }
-    if (this.gold < info.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
+    if (this.players.length > 1) {
+      if (!this._spend(info.cost, t.col, t.row)) return;
+    } else {
+      if (this.gold < info.cost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
+      this.gold -= info.cost;
+    }
     const { recipe } = info;
     const need = t.key === recipe.a ? recipe.b : recipe.a;
     let partner = null;
@@ -247,7 +286,6 @@ export class Game {
     fused.setLevelVisual();
     this.towers.push(fused);
     this.grid.set(`${col},${row}`, fused);
-    this.gold -= info.cost;
     this.selectedTower = fused;
     this.superAggro = true; // 任意合体塔上线：下一波起引来超级怪兽
     this.audio.upgrade();
@@ -261,8 +299,12 @@ export class Game {
   upgradeSelected() {
     const t = this.selectedTower;
     if (!t || t.nextUpgradeCost == null) return;
-    if (this.gold < t.nextUpgradeCost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
-    this.gold -= t.nextUpgradeCost;
+    if (this.players.length > 1) {
+      if (!this._spend(t.nextUpgradeCost, t.col, t.row)) return;
+    } else {
+      if (this.gold < t.nextUpgradeCost) { this.audio.error(); this.ui.toast('💰 金币不足'); return; }
+      this.gold -= t.nextUpgradeCost;
+    }
     t.invested += t.nextUpgradeCost;
     t.level += 1;
     t.setLevelVisual();
@@ -276,7 +318,11 @@ export class Game {
     const t = this.selectedTower;
     if (!t) return;
     if (t.def.fusion) this.superAggro = false; // 卖掉合体塔同样解除仇恨
-    this.gold += t.sellValue;
+    if (this.players.length > 1) {
+      this._earn(t.sellValue, t.col, t.row);
+    } else {
+      this.gold += t.sellValue;
+    }
     this.grid.delete(`${t.col},${t.row}`);
     this.towers.splice(this.towers.indexOf(t), 1);
     t.dispose(this.scene);
@@ -378,8 +424,14 @@ export class Game {
   onEnemyKilled(enemy, tower) {
     if (enemy.counted) return;
     enemy.counted = true;
-    this.gold += enemy.bounty;
-    this.goldEarned += enemy.bounty;
+    // 双人模式：赏金发给路径归属玩家（pathIndex 0=P1 1=P2）
+    if (this.players.length > 1) {
+      this.players[enemy.pathIndex % this.players.length].gold += enemy.bounty;
+      this.goldEarned += enemy.bounty;
+    } else {
+      this.gold += enemy.bounty;
+      this.goldEarned += enemy.bounty;
+    }
     this.kills += 1;
     if (enemy.def.key === 'boss') this.grantBossReward(); // 击杀 BOSS：随机隐藏奖励
     if (tower) tower.kills = (tower.kills || 0) + 1;

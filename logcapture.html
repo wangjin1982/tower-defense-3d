@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<script type="importmap">
+{ "imports": { "three": "/vendor/three.module.js" } }
+</script>
+<script>
+window.__logs = [];
+window.onerror = function(msg, src, line) {
+  window.__logs.push('ERR: ' + String(msg).slice(0, 300) + ' @ ' + String(src).split('/').pop() + ':' + line);
+  return false;
+};
+</script>
+</head><body>
+<script type="module" src="/js/main.js?v=2.8"></script>
+</body></html>

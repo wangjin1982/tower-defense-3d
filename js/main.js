@@ -45,7 +45,7 @@ rim.position.set(-12, 10, -14);
 scene.add(rim);
 
 // 场景与模块
-const mapGroup = buildMap(scene);
+let mapGroup = buildMap(scene, window.__initialMap || 'classic');
 const audio = new AudioFX();
 const effects = new Effects(scene);
 
@@ -110,6 +110,13 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
+
+// 地图切换：game 通过此回调重建地图组
+game.rebuildMap = (mapKey) => {
+  scene.remove(mapGroup);
+  mapGroup = buildMap(scene, mapKey);
+  game.mapRefs = mapGroup.userData;
+};
 
 // 调试句柄（控制台可用：__td.startNextWave() 等）
 window.__td = game;
