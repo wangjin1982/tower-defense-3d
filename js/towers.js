@@ -1,6 +1,6 @@
 // ===== 炮塔 =====
 import * as THREE from 'three';
-import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.5';
+import { TOWERS, LEVEL_MULT, MAX_LEVEL, upgradeCost, HP_BANDS } from './config.js?v=2.6';
 
 function buildMesh(def) {
   const g = new THREE.Group();
@@ -147,6 +147,7 @@ export class Tower {
     this.game = null;   // 由 game 在创建后回填（奖励加成读取用）
     this.beams = [];    // 五角星光束（视觉）
     this.beamAngle = 0;
+    this.recoil = 0; // 加农炮后坐力动画进度
 
     // 耐久条（受损时显示）
     this.bar = new THREE.Group();
@@ -180,7 +181,11 @@ export class Tower {
   }
 
   // 当前等级实际属性
-  get dmg()   { return this.def.dmg * Math.pow(LEVEL_MULT.dmg, this.level - 1); }
+  get dmg()   {
+    // 医疗系（医疗塔/战地维修）成长更平缓：×1.30/级，避免治疗量超标
+    const mult = (this.def.kind === 'medic' || this.def.kind === 'medgun') ? 1.30 : LEVEL_MULT.dmg;
+    return this.def.dmg * Math.pow(mult, this.level - 1);
+  }
   get range() { return this.def.range * Math.pow(LEVEL_MULT.range, this.level - 1); }
   get rate()  { return this.def.rate * Math.pow(LEVEL_MULT.rate, this.level - 1); }
   get nextUpgradeCost() {
@@ -303,13 +308,35 @@ export class Tower {
     this.cooldown -= dt;
     const turret = this.mesh.userData.turret;
 
-    // 超级加农炮：充能环旋转；开火时对一条直线上的所有敌人造成伤害
+    // 超级加农炮：炮塔转向目标 + 充能环旋转；开火时对一条直线上的所有敌人造成伤害
     if (this.def.kind === 'cannon') {
       if (turret.userData.chargeRing) turret.userData.chargeRing.rotation.z += dt * 3;
+      const cannonTarget = this.findTarget(enemies);
+      if (cannonTarget) {
+        // 平滑转向目标（与其它炮塔一致的 aimYaw 机制）
+        const tdx = cannonTarget.mesh.position.x - this.x;
+        const tdz = cannonTarget.mesh.position.z - this.z;
+        const tyaw = Math.atan2(tdx, tdz);
+        let tdiff = tyaw - this.aimYaw;
+        while (tdiff > Math.PI) tdiff -= Math.PI * 2;
+        while (tdiff < -Math.PI) tdiff += Math.PI * 2;
+        this.aimYaw += tdiff * Math.min(1, dt * 10);
+        turret.rotation.y = this.aimYaw;
+      }
+      // 开火后坐力：炮管后缩回弹
+      if (this.recoil > 0) {
+        this.recoil = Math.max(0, this.recoil - dt * 3);
+        for (const c of this.mesh.userData.turret.children) {
+          if (c.geometry?.type === 'CylinderGeometry' && c.position.z > 0.5) {
+            c.position.z = 0.75 - Math.sin(this.recoil * Math.PI) * 0.25;
+          }
+        }
+      }
       if (this.cooldown <= 0) {
         const target = this.findTarget(enemies);
         if (target) {
           this.cooldown = 1 / this.effRate;
+          this.recoil = 1;
           const dx = target.mesh.position.x - this.x;
           const dz = target.mesh.position.z - this.z;
           const len = Math.hypot(dx, dz);
