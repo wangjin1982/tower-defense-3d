@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import {
   TOTAL_WAVES, TOWERS, TOWER_KEYS, DIFFICULTIES, makeWaves, buildWave, stageBoost, STAGE_LEVEL,
   MAX_LEVEL, FUSION_RECIPES,
-} from './config.js?v=2.4';
-import { cellToWorld, isBuildable } from './map.js?v=2.4';
-import { Enemy, PATH_TOTAL } from './enemies.js?v=2.4';
-import { Tower } from './towers.js?v=2.4';
-import { Projectile, Grenade, Peel } from './projectiles.js?v=2.4';
+} from './config.js?v=2.5';
+import { cellToWorld, isBuildable } from './map.js?v=2.5';
+import { Enemy, PATH_TOTAL } from './enemies.js?v=2.5';
+import { Tower } from './towers.js?v=2.5';
+import { Projectile, Grenade, Peel } from './projectiles.js?v=2.5';
 
 export class Game {
   constructor({ scene, camera, audio, effects, ui }) {
@@ -291,8 +291,9 @@ export class Game {
         t += entry.gap;
       }
     }
-    // 冰冻炮/合体塔在场 → 引来超级怪兽；第 20 波全体总攻时超级怪兽也会出现
-    const superWave = this.superAggro === true || this.waveIndex === TOTAL_WAVES;
+    // 合体塔在场 → 引来超级怪兽；第 20 波总攻或加农炮在场同样出现
+    const cannonOnField = this.towers.some((tw) => tw.key === 'cannon' && !tw.dead);
+    const superWave = this.superAggro === true || this.waveIndex === TOTAL_WAVES || cannonOnField;
     if (superWave) {
       const count = this.waveIndex === TOTAL_WAVES ? 3 : Math.min(3, 1 + Math.floor(this.waveIndex / 10));
       for (let i = 0; i < count; i++) {
@@ -327,8 +328,8 @@ export class Game {
     if (!this.waveActive) return;
     this.waveTime += dt;
     const boost = stageBoost(this.waveIndex);
-    // 第 15 波起：怪物全属性狂暴 ×1.5
-    const rage = this.waveIndex >= 15 ? 1.5 : 1;
+    // 第 15 波起：怪物全属性狂暴 ×1.5；加农炮在场：全属性 ×1.2
+    const rage = (this.waveIndex >= 15 ? 1.5 : 1) * (this.towers.some(tw => tw.key === 'cannon' && !tw.dead) ? 1.2 : 1);
     while (this.spawnQueue.length > 0 && this.spawnQueue[0].time <= this.waveTime) {
       const s = this.spawnQueue.shift();
       // 第一只超级怪兽出生：入场动画 + 慢镜头
@@ -692,8 +693,8 @@ export class Game {
 
   toggleSpeed() {
     if (this.state !== 'playing') return;
-    this.speed = this.speed === 1 ? 2 : 1;
-    this.ui.setSpeedText(this.speed === 1 ? '⏩ 1x' : '⏩ 2x');
+    this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1;
+    this.ui.setSpeedText(`⏩ ${this.speed}x`);
   }
 
   cancelAll() {

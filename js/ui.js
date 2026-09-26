@@ -1,5 +1,5 @@
 // ===== UI 层（DOM） =====
-import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.4';
+import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.5';
 
 const BAND_COLORS = { red: '#ff5252', yellow: '#ffd740', green: '#76ff03' };
 
@@ -91,7 +91,7 @@ export class UI {
     if (label) $('btn-wave').textContent = label;
   }
 
-  setSpeedText(text) { $('btn-speed').textContent = text; }
+  setSpeedText(text) { $('btn-speed').textContent = text; } // 支持 ⏩ 1x/2x/3x
   setPauseText(paused) { $('btn-pause').textContent = paused ? '▶' : '⏸'; }
   setMuteText(muted) { $('btn-mute').textContent = muted ? '🔇' : '🔊'; }
 
