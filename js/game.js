@@ -3,11 +3,14 @@ import * as THREE from 'three';
 import {
   TOTAL_WAVES, TOWERS, TOWER_KEYS, DIFFICULTIES, makeWaves, buildWave, stageBoost, STAGE_LEVEL,
   MAX_LEVEL, FUSION_RECIPES,
-} from './config.js?v=2.7';
-import { cellToWorld, isBuildable } from './map.js?v=2.7';
-import { Enemy, PATH_TOTAL } from './enemies.js?v=2.7';
-import { Tower } from './towers.js?v=2.7';
-import { Projectile, Grenade, Peel } from './projectiles.js?v=2.7';
+} from './config.js?v=2.8';
+import { cellToWorld, isBuildable } from './map.js?v=2.8';
+import { Enemy, PATH_TOTAL } from './enemies.js?v=2.8';
+import { setMap as setMapModule, activeMapKey } from './map.js?v=2.8';
+import { initEnemyPaths } from './enemies.js?v=2.8';
+import { MAPS } from './config.js?v=2.8';
+import { Tower } from './towers.js?v=2.8';
+import { Projectile, Grenade, Peel } from './projectiles.js?v=2.8';
 
 export class Game {
   constructor({ scene, camera, audio, effects, ui }) {
@@ -22,6 +25,9 @@ export class Game {
     this.speed = 1;
     this.diffKey = 'normal';
     this.diff = DIFFICULTIES.normal;
+    this.mapKey = 'classic';
+    this.pathCount = 1;
+    this.players = [{ gold: this.diff.startGold, name: 'P1' }];
     this.gold = this.diff.startGold;
     this.lives = this.diff.startLives;
     this.kills = 0;
@@ -82,8 +88,15 @@ export class Game {
     this.ui.selectBuild(null);
   }
 
-  start(diffKey) {
+  start(diffKey, mapKey = 'classic') {
     this._applyDifficulty(diffKey);
+    this.mapKey = MAPS[mapKey] ? mapKey : 'classic';
+    setMapModule(this.mapKey);
+    this.pathCount = MAPS[this.mapKey].paths.length;
+    initEnemyPaths(this.mapKey, this.pathCount);
+    this.players = this.pathCount > 1
+      ? Array.from({ length: this.pathCount }, (_, i) => ({ gold: this.diff.startGold, name: `P${i + 1}` }))
+      : [{ gold: this.diff.startGold, name: 'P1' }];
     this.state = 'playing';
     this.paused = false;
     this.speed = 1;
@@ -110,7 +123,7 @@ export class Game {
 
   restart() {
     this._resetWorld();
-    this.start(this.diffKey);
+    this.start(this.diffKey, this.mapKey); // 重开保持当前地图
   }
 
   backToMenu() {
@@ -340,9 +353,13 @@ export class Game {
       const bountyMul = this.diff.bountyMul * (1 + (this.waveIndex - 1) * 0.05);
       const elite = this.waveIndex >= this.diff.eliteStart
         && Math.random() < this.diff.eliteChance;
+      const pathIdx = this.pathCount > 1
+        ? (s.pathIndex != null ? s.pathIndex : Math.floor(Math.random() * this.pathCount))
+        : 0;
       this.enemies.push(new Enemy(s.type, s.hpMul * rage, this.scene, bountyMul, {
         elite, speedMul: this.diff.speedMul * boost.speed * rage,
         armorMul: this.diff.armorMul * rage, armorBonus: boost.armor,
+        pathIndex: pathIdx,
       }));
     }
     if (this.spawnQueue.length === 0 && this.enemies.length === 0) {
@@ -383,7 +400,7 @@ export class Game {
       // 沿路径原地分裂，前后错开一点，继承行进距离
       const child = new Enemy('fast', wave.hpMul * 0.6 * rage, this.scene, bountyMul, {
         speedMul: this.diff.speedMul * 1.1 * boost.speed * rage, armorMul: this.diff.armorMul * rage,
-        startDist: Math.max(0, Math.min(elite.dist, PATH_TOTAL - 0.01) - i * 0.5),
+        startDist: Math.max(0, Math.min(elite.dist, PATH_TOTAL() - 0.01) - i * 0.5),
       });
       this.enemies.push(child);
     }
@@ -708,7 +725,9 @@ export class Game {
 
   refreshUI() {
     this.ui.setStats({
-      lives: this.lives, gold: this.gold,
+      lives: this.lives,
+      gold: this.players.length > 1 ? null : this.gold,
+      golds: this.players.length > 1 ? this.players.map(p => p.gold) : null,
       wave: Math.max(this.waveIndex, 1), totalWaves: 0, // 无尽模式不显示总波数
     });
   }

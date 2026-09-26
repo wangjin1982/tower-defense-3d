@@ -1,31 +1,41 @@
 // ===== 敌人 =====
 import * as THREE from 'three';
-import { ENEMIES, TILE } from './config.js?v=2.7';
-import { pathWaypoints } from './map.js?v=2.7';
+import { ENEMIES, TILE } from './config.js?v=2.8';
+import { pathWaypoints } from './map.js?v=2.8';
 
 // 全局共享：路径长度与累计里程（所有敌人同一条路）
-const WPS = pathWaypoints();
-const SEG_LEN = [];
-const CUM = [0];
-for (let i = 0; i < WPS.length - 1; i++) {
-  SEG_LEN.push(WPS[i].distanceTo(WPS[i + 1]));
-  CUM.push(CUM[i] + SEG_LEN[i]);
+// 多路径注册表：每条路径一份路点/长度表（initEnemyPaths 由 game 在选图后调用）
+const PATHS = []; // [{ wps, segLen, cum, total }]
+export function initEnemyPaths(mapKey, pathCount) {
+  PATHS.length = 0;
+  for (let pi = 0; pi < pathCount; pi++) {
+    const wps = pathWaypoints(mapKey, pi);
+    const segLen = [];
+    const cum = [0];
+    for (let i = 0; i < wps.length - 1; i++) {
+      segLen.push(wps[i].distanceTo(wps[i + 1]));
+      cum.push(cum[i] + segLen[i]);
+    }
+    PATHS.push({ wps, segLen, cum, total: cum[cum.length - 1] });
+  }
 }
-export const PATH_TOTAL = CUM[CUM.length - 1];
+export const PATH_TOTAL = () => (PATHS[0] ? PATHS[0].total : 0);
 
-function posAt(dist, out) {
-  const d = Math.max(0, Math.min(PATH_TOTAL, dist));
+function posAt(dist, out, pi = 0) {
+  const P = PATHS[Math.min(pi, PATHS.length - 1)];
+  const d = Math.max(0, Math.min(P.total, dist));
   let i = 0;
-  while (i < SEG_LEN.length - 1 && CUM[i + 1] < d) i++;
-  const t = SEG_LEN[i] > 0 ? (d - CUM[i]) / SEG_LEN[i] : 0;
-  out.lerpVectors(WPS[i], WPS[i + 1], t);
+  while (i < P.segLen.length - 1 && P.cum[i + 1] < d) i++;
+  const t = P.segLen[i] > 0 ? (d - P.cum[i]) / P.segLen[i] : 0;
+  out.lerpVectors(P.wps[i], P.wps[i + 1], t);
   return out;
 }
-function dirAt(dist, out) {
-  const d = Math.max(0, Math.min(PATH_TOTAL, dist));
+function dirAt(dist, out, pi = 0) {
+  const P = PATHS[Math.min(pi, PATHS.length - 1)];
+  const d = Math.max(0, Math.min(P.total, dist));
   let i = 0;
-  while (i < SEG_LEN.length - 1 && CUM[i + 1] < d) i++;
-  out.subVectors(WPS[i + 1], WPS[i]).normalize();
+  while (i < P.segLen.length - 1 && P.cum[i + 1] < d) i++;
+  out.subVectors(P.wps[i + 1], P.wps[i]).normalize();
   return out;
 }
 
@@ -184,6 +194,7 @@ export class Enemy {
   constructor(typeKey, hpMul, scene, bountyMul = 1, opts = {}) {
     const def = ENEMIES[typeKey];
     this.id = nextId++;
+    this.pathIndex = opts.pathIndex || 0; // 走哪条路径（双入口地图 0=上 1=下）
     this.def = def;
     this.elite = !!opts.elite;
     this.maxHp = Math.round(def.hp * hpMul * (this.elite ? 2.2 : 1));
@@ -317,14 +328,15 @@ export class Enemy {
     } else {
       this.dist += this.currentSpeed * dt;
     }
-    if (this.dist >= PATH_TOTAL) {
+    const totalLen = PATHS[Math.min(this.pathIndex, PATHS.length - 1)]?.total ?? 0;
+    if (this.dist >= totalLen) {
       this.reachedEnd = true;
       this.alive = false;
       return;
     }
-    posAt(this.dist, this.tmpV);
+    posAt(this.dist, this.tmpV, this.pathIndex);
     this.mesh.position.set(this.tmpV.x, 0.35 + Math.sin(now * 6 + this.id) * 0.06, this.tmpV.z);
-    dirAt(this.dist, this.tmpD);
+    dirAt(this.dist, this.tmpD, this.pathIndex);
     this.mesh.rotation.y = Math.atan2(this.tmpD.x, this.tmpD.z);
     if (this.eliteHalo) {
       this.eliteHalo.rotation.x += dt * 2.5;

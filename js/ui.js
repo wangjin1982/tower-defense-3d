@@ -1,5 +1,5 @@
 // ===== UI 层（DOM） =====
-import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.7';
+import { TOWERS, TOWER_KEYS, MAX_LEVEL, DIFFICULTIES, BUILDABLE_KEYS } from './config.js?v=2.8';
 
 const BAND_COLORS = { red: '#ff5252', yellow: '#ffd740', green: '#76ff03' };
 
@@ -11,9 +11,10 @@ export class UI {
     this.buildBtns = {};
     this.selectedBuild = null;
     this.diffKey = 'normal';
+    this.mapKey = 'classic';
     this.toastTimer = null;
 
-    $('btn-start').addEventListener('click', () => cb.onStart(this.diffKey));
+    $('btn-start').addEventListener('click', () => cb.onStart(this.diffKey, this.mapKey));
     $('btn-restart').addEventListener('click', () => cb.onRestart());
     $('btn-menu').addEventListener('click', () => cb.onMenu());
     $('btn-wave').addEventListener('click', () => cb.onStartWave());
@@ -21,6 +22,20 @@ export class UI {
     $('btn-pause').addEventListener('click', () => cb.onPause());
     $('btn-mute').addEventListener('click', () => cb.onMute());
     $('btn-cancel-build').addEventListener('click', () => this.selectBuild(null));
+
+    // 地图选择
+    const segMap = $('seg-map');
+    for (const btn of segMap.querySelectorAll('button')) {
+      btn.addEventListener('click', () => {
+        this.mapKey = btn.dataset.v;
+        for (const b of segMap.querySelectorAll('button')) {
+          b.classList.toggle('selected', b === btn);
+        }
+        $('map-desc').textContent = btn.dataset.v === 'dual'
+          ? '双入口 · 双人合作 · 独立金钱 · 共享核心'
+          : '单入口 · 单人/合作';
+      });
+    }
 
     // 难度选择
     const seg = $('seg-diff');
@@ -73,15 +88,21 @@ export class UI {
     }
   }
 
-  setStats({ lives, gold, wave, totalWaves }) {
+  setStats({ lives, gold, golds, wave, totalWaves }) {
     $('lives').textContent = lives;
-    $('gold').textContent = gold;
-    $('wave').textContent = totalWaves > 0 ? `${wave} / ${totalWaves}` : `${wave}`;
-    this.refreshAffordable(gold);
-    // 金币不足时取消已选建造
-    if (this.selectedBuild && TOWERS[this.selectedBuild].cost > gold) {
-      this.selectBuild(null);
+    // 双人模式：显示 P1/P2 两个钱包；单人：单钱包
+    const goldChip = $('gold-chip');
+    if (golds) {
+      goldChip.innerHTML = `P1💰<b>${golds[0] ?? 0}</b> P2💰<b>${golds[1] ?? 0}</b>`;
+      this.refreshAffordable(Math.max(...golds));
+    } else {
+      goldChip.innerHTML = `💰 <b id="gold">${gold ?? 0}</b>`;
+      this.refreshAffordable(gold ?? 0);
+      if (this.selectedBuild && TOWERS[this.selectedBuild].cost > (gold ?? 0)) {
+        this.selectBuild(null);
+      }
     }
+    $('wave').textContent = totalWaves > 0 ? `${wave} / ${totalWaves}` : `${wave}`;
   }
 
   setDifficultyText(text) { $('diff-chip').textContent = text; }

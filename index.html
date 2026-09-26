@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>星际防线 3D · 塔防</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
-<link rel="stylesheet" href="style.css?v=2.7">
+<link rel="stylesheet" href="style.css?v=2.8">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
@@ -14,7 +14,7 @@
   <!-- 顶部状态栏 -->
   <div id="topbar" class="hidden">
     <div class="chip heart">❤️ <b id="lives">20</b></div>
-    <div class="chip gold">💰 <b id="gold">220</b></div>
+    <div class="chip gold" id="gold-chip">💰 <b id="gold">220</b></div>
     <div class="chip wave">🌊 第 <b id="wave">1 / 20</b> 波</div>
     <div class="chip diff" id="diff-chip">🟢 普通</div>
     <div class="spacer"></div>
@@ -68,6 +68,14 @@
       <h1>🛡️ 星际防线 3D</h1>
       <p class="subtitle">科幻塔防 · 无尽进攻 · 4 种炮塔 + 5 种合体</p>
       <div class="row">
+        <span class="label">地图</span>
+        <div class="seg" id="seg-map">
+          <button data-v="classic" class="selected">🛡️ 经典防线</button>
+          <button data-v="dual">👥 双子峡谷（双人）</button>
+        </div>
+      </div>
+      <p class="diff-desc" id="map-desc">单入口 · 单人/合作</p>
+      <div class="row">
         <span class="label">难度</span>
         <div class="seg" id="seg-diff">
           <button data-v="normal" class="selected">🟢 普通</button>
@@ -117,6 +125,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=2.7"></script>
+  <script type="module" src="js/main.js?v=2.8"></script>
 </body>
 </html>

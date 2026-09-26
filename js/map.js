@@ -1,8 +1,17 @@
 // ===== 地图：格子换算、路径、场景搭建 =====
 import * as THREE from 'three';
-import { TILE, COLS, ROWS, PATH_CELLS } from './config.js?v=2.7';
+import { TILE, COLS, ROWS, MAPS } from './config.js?v=2.8';
 
-const pathSet = new Set(PATH_CELLS.map(([c, r]) => `${c},${r}`));
+// 当前地图的路径集合（buildMap 前由 setMap 设置；默认经典图）
+let currentMapKey = 'classic';
+let pathSet = new Set(MAPS.classic.paths[0].map(([c, r]) => `${c},${r}`));
+export function setMap(mapKey) {
+  currentMapKey = mapKey;
+  const map = MAPS[mapKey] || MAPS.classic;
+  pathSet = new Set();
+  for (const p of map.paths) for (const [c, r] of p) pathSet.add(`${c},${r}`);
+  return map;
+}
 
 export function inBounds(col, row) {
   return col >= 0 && col < COLS && row >= 0 && row < ROWS;
@@ -24,16 +33,21 @@ export function worldToCell(x, z) {
   if (Math.abs(w.x - x) > TILE / 2 || Math.abs(w.z - z) > TILE / 2) return null;
   return { col, row };
 }
-// 路径世界坐标路点序列
-export function pathWaypoints() {
-  return PATH_CELLS.map(([c, r]) => {
+// 路径世界坐标路点序列（pathIndex = 第几条路径）
+export function pathWaypoints(mapKey = 'classic', pathIndex = 0) {
+  const map = MAPS[mapKey] || MAPS.classic;
+  const path = map.paths[Math.min(pathIndex, map.paths.length - 1)];
+  return path.map(([c, r]) => {
     const { x, z } = cellToWorld(c, r);
     return new THREE.Vector3(x, 0, z);
   });
 }
 
+
 // ===== 搭建场景静态物体 =====
-export function buildMap(scene) {
+export function buildMap(scene, mapKey = 'classic') {
+  setMap(mapKey);
+  const map = MAPS[mapKey] || MAPS.classic;
   const group = new THREE.Group();
   scene.add(group);
 
@@ -62,25 +76,30 @@ export function buildMap(scene) {
     }
   }
 
-  // 路面（更暗、略低）
+  // 路面（更暗、略低）：遍历所有路径
   const pathGeo = new THREE.BoxGeometry(TILE * 0.98, 0.22, TILE * 0.98);
   const pathMat = new THREE.MeshStandardMaterial({
     color: 0x141c29, roughness: 0.6, metalness: 0.2,
   });
-  for (const [c, r] of PATH_CELLS) {
-    const { x, z } = cellToWorld(c, r);
-    const tile = new THREE.Mesh(pathGeo, pathMat);
-    tile.position.set(x, -0.19, z);
-    tile.receiveShadow = true;
-    group.add(tile);
-  }
-
-  // 路径中线发光条
-  const pts = pathWaypoints().map((p) => new THREE.Vector3(p.x, 0.02, p.z));
-  const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
-  group.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({
-    color: 0x37e0ff, transparent: true, opacity: 0.35,
-  })));
+  const lineMats = [0x37e0ff, 0xffb74d]; // 多路径时每条不同颜色
+  map.paths.forEach((path, pi) => {
+    for (const [c, r] of path) {
+      const { x, z } = cellToWorld(c, r);
+      const tile = new THREE.Mesh(pathGeo, pathMat);
+      tile.position.set(x, -0.19, z);
+      tile.receiveShadow = true;
+      group.add(tile);
+    }
+    // 路径中线发光条（每条路径一种颜色）
+    const pts = path.map(([c, r]) => {
+      const { x, z } = cellToWorld(c, r);
+      return new THREE.Vector3(x, 0.02, z);
+    });
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(pts);
+    group.add(new THREE.Line(lineGeo, new THREE.LineBasicMaterial({
+      color: lineMats[pi % lineMats.length], transparent: true, opacity: 0.4,
+    })));
+  });
 
   // 边界围墙
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x1a2433, roughness: 0.9 });
@@ -97,17 +116,25 @@ export function buildMap(scene) {
   mkWall(0.6, hLen, -wLen / 2, 0);
   mkWall(0.6, hLen, wLen / 2, 0);
 
-  // 出生传送门（起点）与基地核心（终点）
-  const start = pts[0];
-  const end = pts[pts.length - 1];
+  // 出生传送门：每条路径起点一个（共享红色警报样式）
+  const gates = [];
+  map.paths.forEach((path, pi) => {
+    const s = cellToWorld(path[0][0], path[0][1]);
+    const gate = new THREE.Mesh(
+      new THREE.TorusGeometry(0.9, 0.14, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0xff5252, emissive: 0xff1744, emissiveIntensity: 0.9 })
+    );
+    gate.position.set(s.x, 0.9, s.z);
+    group.add(gate);
+    gates.push(gate);
+  });
+  group.userData.gates = gates;
+  group.userData.gate = gates[0];
 
-  const gate = new THREE.Mesh(
-    new THREE.TorusGeometry(0.9, 0.14, 12, 32),
-    new THREE.MeshStandardMaterial({ color: 0xff5252, emissive: 0xff1744, emissiveIntensity: 0.9 })
-  );
-  gate.position.set(start.x, 0.9, start.z);
-  group.add(gate);
-  group.userData.gate = gate;
+  // 基地核心位置 = 最后一条路径终点
+  const lastPath = map.paths[map.paths.length - 1];
+  const endCell = lastPath[lastPath.length - 1];
+  const end = cellToWorld(endCell[0], endCell[1]);
 
   const core = new THREE.Group();
   const coreMat = new THREE.MeshStandardMaterial({
@@ -150,3 +177,5 @@ export function buildMap(scene) {
 
   return group;
 }
+
+export const activeMapKey = () => currentMapKey;
